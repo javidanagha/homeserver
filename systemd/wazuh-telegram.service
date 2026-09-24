@@ -1,15 +1,18 @@
 [Unit]
-Description=Wazuh alerts -> Telegram
-After=wazuh-manager.service network-online.target
+Description=Wazuh alerts -> Telegram + PostgreSQL archive
+After=wazuh-manager.service postgresql.service network-online.target
 Wants=network-online.target
 
 [Service]
 User=wazuhtg
 Group=wazuh
 EnvironmentFile=/etc/wazuh-telegram/bot.env
+EnvironmentFile=/etc/wazuh-telegram/db.env
 ExecStart=/usr/bin/python3 /usr/local/bin/wazuh-telegram.py
 Restart=always
 RestartSec=5
+StateDirectory=wazuh-telegram
+StateDirectoryMode=0755
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

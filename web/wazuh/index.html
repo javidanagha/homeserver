@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wazuh · homeserver.lan</title>
+<style>
+  :root{
+    --bg:#1b1c20; --panel:#232428; --border:#313236; --text:#e3e4e7;
+    --muted:#93959d; --muted-dim:#616268; --accent:#d8c9a0; --danger:#d99b9b;
+    --low:#4a4b52;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px}
+  header{display:flex;justify-content:space-between;align-items:baseline;padding:18px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px}
+  header .title{display:flex;align-items:center;gap:8px;font-weight:600;font-size:16px}
+  header .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  header .dot.stale{background:var(--danger)}
+  header .crumbs{color:var(--muted);font-family:var(--mono);font-size:12px}
+  header .crumbs a{color:var(--muted);text-decoration:none}
+  header .crumbs a:hover{color:var(--text)}
+  header .updated{color:var(--muted-dim);font-family:var(--mono);font-size:11px;text-align:right}
+  main{max-width:1080px;margin:0 auto;padding:20px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  @media (max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .stat .l{color:var(--muted);font-size:12px}
+  .stat .v{font-size:26px;font-weight:600;margin-top:4px}
+  .stat .v.hi{color:var(--accent)}
+  .stat .s{font-family:var(--mono);font-size:11px;color:var(--muted-dim);margin-top:2px}
+  .stat.clickable{cursor:pointer}
+  .stat.clickable:hover,.stat.clickable:focus-visible{border-color:var(--muted-dim);outline:none}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px}
+  .panel h2{margin:0 0 2px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .panel .sub{color:var(--muted-dim);font-size:11px;margin-bottom:10px}
+  .legend{display:inline-flex;gap:14px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+  .cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  @media (max-width:800px){.cols{grid-template-columns:1fr}}
+  .rank{list-style:none;margin:0;padding:0}
+  .rank li{display:flex;align-items:center;gap:8px;padding:5px 0;font-family:var(--mono);font-size:12px}
+  .rank .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rank .bar{height:4px;border-radius:2px;background:var(--accent);opacity:.6}
+  .rank .n{color:var(--muted);min-width:24px;text-align:right}
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+  th{text-align:left;color:var(--muted-dim);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);white-space:nowrap}
+  td.ip{color:var(--text)}
+  td.lv.hi{color:var(--accent)}
+  td.lv.crit{color:var(--danger)}
+  td.p{max-width:320px;overflow:hidden;text-overflow:ellipsis}
+  .empty{color:var(--muted-dim);font-family:var(--mono);font-size:12px;padding:14px 0}
+  .tooltip{position:absolute;pointer-events:none;background:#141518;color:var(--text);border:1px solid var(--border);font-family:var(--mono);font-size:11px;padding:4px 7px;border-radius:5px;opacity:0;transition:opacity .1s;white-space:nowrap;transform:translate(-50%,-100%)}
+  #chart-wrap{position:relative}
+  .btn-link{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer}
+  .btn-link:hover,.btn-link:focus-visible{color:var(--text);border-color:var(--muted-dim);outline:none}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
+  .modal-backdrop.open{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:1280px;width:100%;max-height:85vh;display:flex;flex-direction:column}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .modal-head .count{color:var(--muted-dim);font-family:var(--mono);font-size:11px}
+  .modal-head .x{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1}
+  .modal-body{overflow:auto;padding:0 16px 16px}
+  .cols>.panel{min-width:0}
+  td.wrap{white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:none;vertical-align:top}
+  .modal td{vertical-align:top}
+  th.sortable{cursor:pointer;user-select:none}
+  th.sortable:hover{color:var(--text)}
+  th.sortable.active{color:var(--accent)}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px 0}
+  .controls input,.controls select{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:6px 8px;border-radius:6px}
+  .controls input{flex:1;min-width:200px}
+  .controls input:focus-visible,.controls select:focus-visible{outline:none;border-color:var(--muted-dim)}
+  .result-note{color:var(--muted-dim);font-family:var(--mono);font-size:11px;padding:8px 16px 0}
+  .result-note:empty{display:none}
+  @media (prefers-reduced-motion:reduce){.tooltip{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="title"><span class="dot" id="state-dot"></span>wazuh<span style="color:var(--muted-dim)">.homeserver.lan</span></div>
+  <div style="text-align:right">
+    <div class="crumbs"><a href="/">&larr; lobby</a> &middot; Wazuh manager &middot; host intrusion detection</div>
+    <div class="updated" id="updated">updated --:--:--</div>
+  </div>
+</header>
+<main>
+  <div class="stats">
+    <div class="stat clickable" id="tile-24h" tabindex="0" role="button"><div class="l">Alerts in the last 24 hours</div><div class="v" id="s-24h">0</div><div class="s" id="s-24h-sub">&nbsp;</div></div>
+    <div class="stat clickable" id="tile-high" tabindex="0" role="button"><div class="l">Critical in the last 24 hours</div><div class="v hi" id="s-high">0</div><div class="s" id="s-high-sub">&nbsp;</div></div>
+    <div class="stat clickable" id="tile-logins" tabindex="0" role="button"><div class="l">Logins in the last 24 hours</div><div class="v" id="s-logins">0</div><div class="s" id="s-failed">&nbsp;</div></div>
+    <div class="stat clickable" id="tile-uniq" tabindex="0" role="button"><div class="l">Unique sources, 7 days</div><div class="v" id="s-uniq">0</div><div class="s">show all sources</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Alerts per hour <span class="legend"><span><i style="background:var(--accent)"></i><span id="lg-hi">critical</span></span><span><i style="background:var(--low)"></i><span id="lg-lo">other</span></span></span></h2>
+    <div class="sub">Last 24 hours, your local time</div>
+    <div id="chart-wrap"><svg id="chart" style="width:100%;display:block" role="img" aria-label="Alerts per hour, last 24 hours"></svg><div class="tooltip" id="tip"></div></div>
+  </div>
+
+  <div class="cols">
+    <div class="panel"><h2>Top rules</h2><div class="sub">by alert count, 7 days</div><ul class="rank" id="top-rules"></ul></div>
+    <div class="panel"><h2>Top sources</h2><div class="sub">by IP, 7 days</div><ul class="rank" id="top-ips"></ul></div>
+    <div class="panel"><h2>Severity</h2><div class="sub">alert level, 7 days</div><ul class="rank" id="levels"></ul></div>
+  </div>
+
+  <div class="panel">
+    <h2>Recent alerts <button class="btn-link" id="show-all-logs">Show all logs</button></h2>
+    <div class="sub">Newest first, up to 100</div>
+    <div id="recent-wrap" class="table-wrap"></div>
+  </div>
+</main>
+
+<div class="modal-backdrop" id="log-modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="log-modal-title">
+    <div class="modal-head">
+      <div><span id="log-modal-title">All archived alerts</span> <span class="count" id="log-modal-count"></span></div>
+      <button class="x" data-close aria-label="Close">&times;</button>
+    </div>
+    <div class="controls" id="f-controls">
+      <input type="search" id="f-q" placeholder="Search description, IP, rule, path, user" aria-label="Search alerts">
+      <select id="f-cat" aria-label="Category">
+        <option value="all">All categories</option>
+        <option value="logins">Logins, all</option>
+        <option value="login_ok">Successful logins</option>
+        <option value="login_fail">Failed logins</option>
+        <option value="waf">WAF blocks</option>
+      </select>
+      <select id="f-level" aria-label="Minimum severity">
+        <option value="0">Any severity</option>
+        <option value="7">L7 and above</option>
+        <option value="10">L10 and above</option>
+        <option value="12">L12 and above</option>
+      </select>
+      <select id="f-range" aria-label="Time range">
+        <option value="24h">Last 24 hours</option>
+        <option value="7d">Last 7 days</option>
+        <option value="all">All time</option>
+      </select>
+      <select id="f-sort" aria-label="Sort order">
+        <option value="new">Newest first</option>
+        <option value="old">Oldest first</option>
+        <option value="sev_desc">Severity: high to low</option>
+        <option value="sev_asc">Severity: low to high</option>
+      </select>
+    </div>
+    <div class="result-note" id="f-note"></div>
+    <div class="modal-body table-wrap" id="log-modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="ip-modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ip-modal-title">
+    <div class="modal-head">
+      <div id="ip-modal-title">Unique sources <span class="count" id="ip-modal-count"></span></div>
+      <button class="x" data-close aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body table-wrap" id="ip-modal-body"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var ACCENT = '#d8c9a0', LOW = '#4a4b52';
+  var lastHourly = [];
+
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+  function svgEl(tag, attrs) {
+    var e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    return e;
+  }
+  function fmtTime(iso) { return new Date(iso).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}); }
+  function fmtDateTime(iso) { return new Date(iso).toLocaleString(); }
+  function lvClass(l) { return 'lv' + (l >= 12 ? ' crit' : (l >= 10 ? ' hi' : '')); }
+
+  function renderRank(id, entries) {
+    var ul = $(id);
+    ul.textContent = '';
+    if (!entries || !entries.length) { ul.appendChild(el('li', 'empty', 'no data')); return; }
+    var max = Math.max.apply(null, entries.map(function (e) { return e[1]; })) || 1;
+    entries.forEach(function (e) {
+      var li = el('li');
+      var name = el('span', 'name', e[0]);
+      name.title = e[0];
+      var bar = el('span', 'bar');
+      bar.style.width = Math.max(6, (e[1] / max) * 60) + 'px';
+      li.appendChild(name);
+      li.appendChild(bar);
+      li.appendChild(el('span', 'n', e[1]));
+      ul.appendChild(li);
+    });
+  }
+
+  var HEAD_SORT = {Time: ['new', 'old'], Level: ['sev_desc', 'sev_asc']};
+  var ARROW = {'new': ' ↓', 'old': ' ↑', 'sev_desc': ' ↓', 'sev_asc': ' ↑'};
+
+  function alertTable(rows, inModal, currentSort, onSort) {
+    var table = el('table');
+    var thead = el('thead');
+    var hr = el('tr');
+    ['Time', 'Level', 'Rule', 'Description', 'Source', 'Detail'].forEach(function (h) {
+      var th = el('th', null, h);
+      var opts = HEAD_SORT[h];
+      if (inModal && opts) {
+        th.className = 'sortable';
+        th.tabIndex = 0;
+        th.setAttribute('role', 'button');
+        if (opts.indexOf(currentSort) >= 0) {
+          th.className += ' active';
+          th.textContent = h + ARROW[currentSort];
+        }
+        var next = currentSort === opts[0] ? opts[1] : opts[0];
+        th.title = 'Sort by ' + h.toLowerCase();
+        th.addEventListener('click', function () { onSort(next); });
+        th.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); onSort(next); }
+        });
+      }
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = el('tbody');
+    var wrapCls = inModal ? 'wrap' : 'p';
+    rows.forEach(function (r) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, inModal ? fmtDateTime(r.ts) : fmtTime(r.ts)));
+      tr.appendChild(el('td', lvClass(r.level), 'L' + r.level));
+      tr.appendChild(el('td', null, r.rule));
+      var desc = el('td', wrapCls, r.desc);
+      desc.title = r.desc;
+      tr.appendChild(desc);
+      tr.appendChild(el('td', 'ip', r.ip || '–'));
+      var det = el('td', wrapCls, r.detail || '');
+      det.title = r.detail || '';
+      tr.appendChild(det);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function renderRecent(rows) {
+    var wrap = $('recent-wrap');
+    wrap.textContent = '';
+    if (!rows.length) { wrap.appendChild(el('div', 'empty', 'no alerts archived yet')); return; }
+    wrap.appendChild(alertTable(rows, false));
+  }
+
+  function renderChart(hourly) {
+    var svg = $('chart'), tip = $('tip');
+    var W = Math.max(280, svg.parentElement.getBoundingClientRect().width);
+    var H = 140, padL = 4, padR = 4, padT = 8, padB = 20;
+    var innerW = W - padL - padR, innerH = H - padT - padB;
+    var n = hourly.length || 1;
+    var max = Math.max(1, Math.max.apply(null, hourly.map(function (d) { return d.hi + d.lo; })));
+    var gap = 3, barW = Math.max(2, innerW / n - gap);
+    var labelEvery = W < 420 ? 6 : 3;
+
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('height', H);
+    svg.textContent = '';
+
+    [0, 0.5, 1].forEach(function (f) {
+      var y = padT + innerH * (1 - f);
+      svg.appendChild(svgEl('line', {x1: padL, x2: W - padR, y1: y, y2: y, stroke: '#2b2c31', 'stroke-width': 1}));
+    });
+
+    hourly.forEach(function (d, i) {
+      var x = padL + i * (innerW / n) + gap / 2;
+      var scale = (innerH - 6) / max;
+      var hLo = d.lo * scale, hHi = d.hi * scale;
+      var base = padT + innerH;
+      var total = d.hi + d.lo;
+      if (!total) {
+        svg.appendChild(svgEl('rect', {x: x, y: base - 1, width: barW, height: 1, fill: LOW, opacity: 0.5}));
+      }
+      if (d.lo) {
+        svg.appendChild(svgEl('rect', {x: x, y: base - hLo, width: barW, height: Math.max(1, hLo), rx: Math.min(2, barW / 2), fill: LOW}));
+      }
+      if (d.hi) {
+        svg.appendChild(svgEl('rect', {x: x, y: base - hLo - hHi, width: barW, height: Math.max(1, hHi), rx: Math.min(2, barW / 2), fill: ACCENT, opacity: 0.9}));
+      }
+      var top = base - hLo - hHi;
+      var hit = svgEl('rect', {x: x - gap / 2, y: padT, width: barW + gap, height: innerH, fill: 'transparent'});
+      hit.addEventListener('mousemove', function (ev) {
+        var r = svg.getBoundingClientRect();
+        tip.style.left = (ev.clientX - r.left) + 'px';
+        tip.style.top = (top - 6) + 'px';
+        tip.textContent = new Date(d.h).toLocaleTimeString([], {hour: '2-digit'}) + ' — ' +
+          total + (total === 1 ? ' alert' : ' alerts') + (d.hi ? ', ' + d.hi + ' critical' : '');
+        tip.style.opacity = '1';
+      });
+      hit.addEventListener('mouseleave', function () { tip.style.opacity = '0'; });
+      svg.appendChild(hit);
+
+      if (i % labelEvery === 0) {
+        var t = svgEl('text', {x: x + barW / 2, y: H - 6, 'text-anchor': 'middle', 'font-size': 9, fill: '#616268', 'font-family': 'ui-monospace,monospace'});
+        t.textContent = new Date(d.h).getHours() + 'h';
+        svg.appendChild(t);
+      }
+    });
+  }
+
+  function setStale(stale) {
+    $('state-dot').classList.toggle('stale', stale);
+  }
+
+  function render(d) {
+    var fresh = d.ok && (Date.now() - new Date(d.generated).getTime()) < 120000;
+    setStale(!fresh);
+    $('updated').textContent = (fresh ? 'updated ' : 'stale · last update ') + new Date(d.generated).toLocaleTimeString();
+    if (!d.ok) return;
+    var c = d.counts;
+    minLevel = d.min_level;
+    if (!document.querySelector('#f-level option[value="' + minLevel + '"]')) {
+      var o = el('option', null, 'L' + minLevel + ' and above');
+      o.value = String(minLevel);
+      $('f-level').appendChild(o);
+    }
+    $('s-24h').textContent = c.total_24h;
+    $('s-24h-sub').textContent = 'archived at L' + d.archive_level + '+ · ' + c.total_7d + ' in 7 days';
+    $('s-high').textContent = c.high_24h;
+    $('s-high-sub').textContent = 'L' + d.min_level + '+ sent to Telegram';
+    $('s-logins').textContent = c.logins_24h;
+    $('s-failed').textContent = c.failed_logins_24h + ' failed';
+    $('s-uniq').textContent = c.uniq_ips_7d;
+    $('lg-hi').textContent = 'critical (L' + d.min_level + '+)';
+    $('lg-lo').textContent = 'other';
+    renderRank('top-rules', d.top_rules);
+    renderRank('top-ips', d.top_ips);
+    renderRank('levels', d.levels);
+    renderRecent(d.recent);
+    lastHourly = d.hourly;
+    renderChart(lastHourly);
+  }
+
+  function refresh() {
+    fetch('/wazuh.json', {cache: 'no-store'})
+      .then(function (r) { return r.json(); })
+      .then(render)
+      .catch(function () { setStale(true); $('updated').textContent = 'wazuh.json unreachable'; });
+  }
+
+  window.addEventListener('resize', function () { if (lastHourly.length) renderChart(lastHourly); });
+  refresh();
+  setInterval(refresh, 30000);
+
+  /* ---------- modals ---------- */
+  var full = null, fullAt = 0, LIMIT = 500, minLevel = 10;
+
+  function loadFull(body, cb) {
+    if (full && Date.now() - fullAt < 60000) { cb(full); return; }
+    body.textContent = 'loading…';
+    fetch('/wazuh-full.json', {cache: 'no-store'})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        d.entries.forEach(function (r) {
+          r._t = Date.parse(r.ts);
+          r.groups = r.groups || '';
+          r._hay = [r.desc, r.ip, r.detail, r.user, 'L' + r.level, r.rule].join(' ').toLowerCase();
+        });
+        full = d; fullAt = Date.now();
+        cb(d);
+      })
+      .catch(function () { body.textContent = 'Could not load /wazuh-full.json. Check that wazuh-telegram is running.'; });
+  }
+
+  function hasGroup(g, name) { return (',' + g + ',').indexOf(',' + name + ',') >= 0; }
+  function catOk(r, cat) {
+    var g = r.groups;
+    var ok = hasGroup(g, 'authentication_success');
+    var fail = hasGroup(g, 'authentication_failed') || hasGroup(g, 'authentication_failures');
+    if (cat === 'logins') return ok || fail;
+    if (cat === 'login_ok') return ok;
+    if (cat === 'login_fail') return fail;
+    if (cat === 'waf') return hasGroup(g, 'waf');
+    return true;
+  }
+  var SORTS = {
+    'new': function (a, b) { return b._t - a._t; },
+    'old': function (a, b) { return a._t - b._t; },
+    'sev_desc': function (a, b) { return (b.level - a.level) || (b._t - a._t); },
+    'sev_asc': function (a, b) { return (a.level - b.level) || (b._t - a._t); }
+  };
+
+  function applyFilters() {
+    if (!full) return;
+    var body = $('log-modal-body');
+    var q = $('f-q').value.trim().toLowerCase();
+    var cat = $('f-cat').value, minL = +$('f-level').value, range = $('f-range').value;
+    var cutoff = range === '24h' ? Date.now() - 864e5 : (range === '7d' ? Date.now() - 6048e5 : 0);
+    var rows = full.entries.filter(function (r) {
+      return r.level >= minL && r._t >= cutoff && catOk(r, cat) && (!q || r._hay.indexOf(q) >= 0);
+    });
+    rows.sort(SORTS[$('f-sort').value]);
+    $('log-modal-count').textContent = '(' + rows.length + ')';
+    var note = '';
+    if (rows.length > LIMIT) note = 'Showing the first ' + LIMIT + ' of ' + rows.length + ' matches. Narrow the filters to see the rest.';
+    else if (full.count >= 20000 && range === 'all') note = 'This view covers the newest 20,000 archived alerts.';
+    $('f-note').textContent = note;
+    body.textContent = '';
+    if (!rows.length) { body.appendChild(el('div', 'empty', 'No alerts match these filters.')); return; }
+    body.appendChild(alertTable(rows.slice(0, LIMIT), true, $('f-sort').value, function (next) {
+      $('f-sort').value = next;
+      applyFilters();
+    }));
+  }
+
+  function openList(preset) {
+    $('log-modal-title').textContent = preset.title;
+    $('log-modal-count').textContent = '';
+    $('f-note').textContent = '';
+    $('f-q').value = '';
+    $('f-cat').value = preset.cat || 'all';
+    $('f-level').value = String(preset.level || 0);
+    $('f-range').value = preset.range || 'all';
+    $('f-sort').value = preset.sort || 'new';
+    $('f-controls').style.display = preset.controls ? '' : 'none';
+    $('f-range').style.display = preset.lockRange ? 'none' : '';
+    $('log-modal').classList.add('open');
+    loadFull($('log-modal-body'), function () { applyFilters(); if (preset.controls) $('f-q').focus(); });
+  }
+
+  var qTimer = null;
+  $('f-q').addEventListener('input', function () { clearTimeout(qTimer); qTimer = setTimeout(applyFilters, 150); });
+  ['f-cat', 'f-level', 'f-range', 'f-sort'].forEach(function (id) { $(id).addEventListener('change', applyFilters); });
+
+  function clickable(id, fn) {
+    $(id).addEventListener('click', fn);
+    $(id).addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); fn(); }
+    });
+  }
+  clickable('tile-24h', function () { openList({title: 'Alerts, last 24 hours', range: '24h'}); });
+  clickable('tile-high', function () { openList({title: 'Critical alerts (L' + minLevel + '+), last 24 hours', range: '24h', level: minLevel}); });
+  clickable('tile-logins', function () { openList({title: 'Successful logins, last 24 hours', range: '24h', cat: 'login_ok'}); });
+  $('show-all-logs').addEventListener('click', function () { openList({title: 'All archived alerts', range: 'all', controls: true}); });
+
+  [$('log-modal'), $('ip-modal')].forEach(function (bd) {
+    bd.addEventListener('click', function (ev) {
+      if (ev.target === bd || ev.target.hasAttribute('data-close')) bd.classList.remove('open');
+    });
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') {
+      $('log-modal').classList.remove('open');
+      $('ip-modal').classList.remove('open');
+    }
+  });
+
+  function openIps() {
+    var body = $('ip-modal-body');
+    $('ip-modal').classList.add('open');
+    loadFull(body, function (d) {
+      var stats = {};
+      d.entries.forEach(function (r) {
+        if (!r.ip) return;
+        var s = stats[r.ip] || (stats[r.ip] = {count: 0, crit: 0, last: r._t});
+        s.count += 1;
+        if (r.level >= minLevel) s.crit += 1;
+        if (r._t > s.last) s.last = r._t;
+      });
+      var list = Object.keys(stats).map(function (ip) { return {ip: ip, s: stats[ip]}; });
+      list.sort(function (a, b) { return b.s.count - a.s.count; });
+      $('ip-modal-count').textContent = '(' + list.length + ')';
+      body.textContent = '';
+      if (!list.length) { body.appendChild(el('div', 'empty', 'No alerts with a source IP yet.')); return; }
+      var table = el('table');
+      var thead = el('thead'), hr = el('tr');
+      ['Source IP', 'Alerts', 'Critical', 'Last seen'].forEach(function (h) { hr.appendChild(el('th', null, h)); });
+      thead.appendChild(hr);
+      table.appendChild(thead);
+      var tbody = el('tbody');
+      list.forEach(function (r) {
+        var tr = el('tr');
+        tr.appendChild(el('td', 'ip', r.ip));
+        tr.appendChild(el('td', null, r.s.count));
+        tr.appendChild(el('td', r.s.crit ? 'lv hi' : null, r.s.crit));
+        tr.appendChild(el('td', null, new Date(r.s.last).toLocaleString()));
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      body.appendChild(table);
+    });
+  }
+  clickable('tile-uniq', openIps);
+})();
+</script>
+</body>
+</html>

@@ -6,6 +6,22 @@ server {
     root /var/www/homeserver;
     index index.html;
 
+    location ^~ /wazuh/ {
+        try_files $uri /wazuh/index.html;
+    }
+
+    location = /wazuh-full.json {
+        alias /var/lib/wazuh-telegram/wazuh-full.json;
+        default_type application/json;
+        add_header Cache-Control "no-store";
+    }
+
+    location = /wazuh.json {
+        alias /var/lib/wazuh-telegram/wazuh.json;
+        default_type application/json;
+        add_header Cache-Control "no-store";
+    }
+
     location /files/ {
         proxy_pass http://127.0.0.1:8081/;
         proxy_set_header Host $host;
