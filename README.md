@@ -90,7 +90,5 @@ Configs are sanitized: credentials, keys, certificates and network-specific secr
 - [x] Pi-hole + encrypted upstream DNS
 - [x] Caddy + Coraza WAF, dashboard, PostgreSQL archive
 - [x] Wazuh manager
-- [ ] Wazuh → Telegram alerting + `wazuh_alerts` archive and lobby card
-- [ ] Cowrie honeypot feeding Wazuh
-- [ ] Off-box data backups (restic), unattended-upgrades
-- [ ] Local voice assistant (faster-whisper + Ollama + Piper) with an ESP32-S3 satellite
+
+
