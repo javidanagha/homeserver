@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""Summarise Coraza WAF blocks (from Caddy's JSON access log) into waf.json
-for the lobby card + /waf/ dashboard.
-
-A genuine WAF block is identified by status 403 + the X-Waf-Block: true
-response header, which the Caddyfile's `handle_errors 403` block sets only
-when coraza_waf itself raised the error (not a plain 403 from an upstream
-app like Adminer/Filebrowser)."""
 import glob, gzip, json, os, re, sys, tempfile, time
 try:
     import psycopg2
