@@ -1,0 +1,48 @@
+{
+	order coraza_waf first
+	admin off
+}
+
+homeserver.lan {
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 10mb
+			roll_keep 10
+		}
+		format json
+	}
+
+	tls /etc/nginx/certs/homeserver.lan+4.pem /etc/nginx/certs/homeserver.lan+4-key.pem
+
+	@notws not header Upgrade *
+	coraza_waf @notws {
+		load_owasp_crs
+		directives `
+            Include @coraza.conf-recommended
+            Include @crs-setup.conf.example
+            Include @owasp_crs/*.conf
+            SecRuleEngine On
+        `
+	}
+
+	handle_errors 403 {
+		header X-Waf-Block "true"
+		respond "Blocked by WAF" 403
+	}
+
+	reverse_proxy 127.0.0.1:8090
+}
+
+uptime.homeserver.lan {
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 10mb
+			roll_keep 10
+		}
+		format json
+	}
+
+	tls /etc/nginx/certs/homeserver.lan+4.pem /etc/nginx/certs/homeserver.lan+4-key.pem
+
+	reverse_proxy 127.0.0.1:8090
+}

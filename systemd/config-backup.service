@@ -1,0 +1,9 @@
+[Unit]
+Description=Backup server configs to private GitHub repo
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=homeserver
+ExecStart=/home/homeserver/backup-configs.sh

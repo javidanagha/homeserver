@@ -1,0 +1,12 @@
+[Unit]
+Description=Summarise Coraza WAF blocks (Caddy access log) to JSON for lobby page
+After=caddy.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/waf-sync/db.env
+ExecStart=/usr/local/bin/waf-sync.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Sync Uptime Kuma heartbeat status to static JSON for lobby page
+After=uptime-kuma.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/status-sync.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

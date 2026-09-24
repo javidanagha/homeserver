@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>homeserver</title>
+<style>
+  :root {
+    --bg: #1b1c20;
+    --panel: #232428;
+    --panel-hover: #27282d;
+    --border: #313236;
+    --text: #e3e4e7;
+    --muted: #93959d;
+    --muted-dim: #616268;
+    --accent: #d8c9a0;
+    --danger: #d99b9b;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 56px 28px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 22px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .brand-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    flex: none;
+  }
+  h1 {
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    margin: 0;
+    font-family: var(--mono);
+  }
+  h1 span { color: var(--muted); font-weight: 400; }
+  .meta {
+    font-size: 11.5px;
+    color: var(--muted);
+    font-family: var(--mono);
+    text-align: right;
+    line-height: 1.6;
+  }
+  .meta b { color: var(--muted-dim); font-weight: 400; }
+
+  .section-label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 1.6px;
+    color: var(--muted-dim);
+    margin: 0 0 16px 2px;
+    font-weight: 600;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+    gap: 12px;
+    margin-bottom: 44px;
+  }
+
+  .card {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    text-decoration: none;
+    color: var(--text);
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .card:hover {
+    border-color: var(--muted-dim);
+    background: var(--panel-hover);
+  }
+  .card .icon {
+    flex: none;
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    color: var(--accent);
+  }
+  .card .icon svg { width: 18px; height: 18px; }
+  .card .body { min-width: 0; flex: 1; }
+  .card .name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card .desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+    margin-bottom: 8px;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    font-family: var(--mono);
+    color: var(--muted);
+  }
+  .pill::before {
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex: none;
+  }
+  .pill.s-up { color: var(--accent); }
+  .pill.s-up::before { background: var(--accent); }
+  .pill.s-down { color: var(--danger); }
+  .pill.s-down::before { background: var(--danger); }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 11px;
+    color: var(--muted-dim);
+    font-family: var(--mono);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  footer a { color: var(--muted); text-decoration: none; }
+  footer a:hover { color: var(--accent); }
+  .waf-card{grid-column:1/-1}
+  .waf-card .stretch{position:absolute;inset:0;z-index:2;border-radius:10px}
+  .waf-list{list-style:none;margin:10px 0 0;padding:0;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .waf-list li{display:flex;gap:12px;padding:5px 0;border-top:1px solid var(--border);white-space:nowrap;overflow:hidden}
+  .waf-list .t{color:var(--muted-dim);flex:none}
+  .waf-list .ip{color:var(--text);flex:none}
+  .waf-list .p{overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <h1>homeserver<span>.lan</span></h1>
+      </div>
+      <div class="meta">
+        <b>HP ProDesk 400 G2</b> &middot; Ubuntu Server<br>
+        TLS via local CA (mkcert)
+      </div>
+    </header>
+
+    <div class="section-label">Services</div>
+    <div class="grid">
+
+      <a class="card" href="/admin">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="name">Pi-hole</div>
+          <div class="desc">DNS &amp; ad-block</div>
+          <span class="pill" data-badge="1">…</span>
+        </div>
+      </a>
+
+      <a class="card" href="/files/">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M4 4h16v4H4z"/><path d="M4 10h16v10H4z"/><path d="M8 14h.01M8 17h.01"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="name">Files</div>
+          <div class="desc">Samba</div>
+          <span class="pill" data-badge="2">…</span>
+        </div>
+      </a>
+
+      <a class="card" href="/db/">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="name">Database</div>
+          <div class="desc">PostgreSQL</div>
+          <span class="pill" data-badge="3">…</span>
+        </div>
+      </a>
+
+      <a class="card" href="https://uptime.homeserver.lan" target="_blank" rel="noopener">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="name">Uptime</div>
+          <div class="desc">Service monitoring</div>
+          <span class="pill" data-badge="4">…</span>
+        </div>
+      </a>
+
+    </div>
+
+    <div class="section-label">Security</div>
+    <div class="grid">
+      <div class="card waf-card">
+        <a class="stretch" href="/waf/" aria-label="Open WAF dashboard"></a>
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <div class="body">
+          <div class="name">WAF <span class="pill" id="waf-mode">&hellip;</span></div>
+          <div class="desc">Coraza &middot; OWASP CRS &middot; <span id="waf-count">&ndash;</span> blocked in 24h &middot; open dashboard &rarr;</div>
+          <ul class="waf-list" id="waf-list"></ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">Access</div>
+    <div class="grid">
+
+      <div class="card">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="4" y="10" width="16" height="10" rx="1"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="name">SSH</div>
+          <div class="desc">Port 22 &middot; key auth only</div>
+          <span class="pill" data-badge="5">…</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
+          </svg>
+        </div>
+        <div class="body">
+          <div class="name">Pi-hole DNS</div>
+          <div class="desc">Port 53 &middot; Quad9 upstream</div>
+          <span class="pill" data-badge="6">…</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    (function () {
+      function apply(id, val) {
+        var el = document.querySelector('[data-badge="' + id + '"]');
+        if (!el) return;
+        el.classList.remove('s-up', 's-down');
+        if (val === 1) { el.textContent = 'up'; el.classList.add('s-up'); }
+        else if (val === 0) { el.textContent = 'down'; el.classList.add('s-down'); }
+        else { el.textContent = 'n/a'; }
+      }
+      function refresh() {
+        fetch('/status.json', { cache: 'no-store' })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            Object.keys(data).forEach(function (id) { apply(id, data[id]); });
+          })
+          .catch(function () {});
+      }
+      refresh();
+      setInterval(refresh, 15000);
+    })();
+  </script>
+<script>
+(function () {
+  var MODES = {On: ['blocking', 's-up'], DetectionOnly: ['detect only', ''], Off: ['off', 's-down']};
+  function render(d) {
+    var pill = document.getElementById('waf-mode');
+    var m = MODES[d.mode] || [d.mode, ''];
+    pill.textContent = m[0];
+    pill.classList.remove('s-up', 's-down');
+    if (m[1]) pill.classList.add(m[1]);
+    document.getElementById('waf-count').textContent = d.count24h;
+    var ul = document.getElementById('waf-list');
+    ul.textContent = '';
+    if (!d.recent.length) {
+      var li = document.createElement('li');
+      li.textContent = 'no blocked requests in the last 24h';
+      ul.appendChild(li);
+      return;
+    }
+    d.recent.slice(0, 8).forEach(function (r) {
+      var li = document.createElement('li');
+      [['t', new Date(r.t).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})],
+       ['ip', r.ip], ['p', r.m + ' ' + r.p]].forEach(function (c) {
+        var s = document.createElement('span');
+        s.className = c[0];
+        s.textContent = c[1];
+        li.appendChild(s);
+      });
+      ul.appendChild(li);
+    });
+  }
+  function refresh() {
+    fetch('/waf.json', {cache: 'no-store'})
+      .then(function (r) { return r.json(); })
+      .then(render)
+      .catch(function () {});
+  }
+  refresh();
+  setInterval(refresh, 30000);
+})();
+</script>
+</body>
+</html>

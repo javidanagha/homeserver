@@ -1,0 +1,12 @@
+[Unit]
+Description=Adminer (PostgreSQL panel)
+After=network.target postgresql.service
+
+[Service]
+User=homeserver
+WorkingDirectory=/var/www/adminer
+ExecStart=/usr/bin/php -S 127.0.0.1:8082 -t /var/www/adminer
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

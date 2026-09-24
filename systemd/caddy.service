@@ -1,0 +1,14 @@
+[Unit]
+Description=Caddy (Coraza WAF reverse proxy)
+After=network.target nginx.service
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+ExecReload=/usr/local/bin/caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+TimeoutStopSec=5s
+LimitNOFILE=1048576
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

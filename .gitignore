@@ -1,0 +1,6 @@
+*.env
+*.pem
+*.key
+*key*
+*.pass
+client.keys

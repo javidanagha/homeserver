@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WAF · homeserver.lan</title>
+<style>
+  :root{
+    --bg:#1b1c20; --panel:#232428; --border:#313236; --text:#e3e4e7;
+    --muted:#93959d; --muted-dim:#616268; --accent:#d8c9a0; --danger:#d99b9b;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px}
+  header{display:flex;justify-content:space-between;align-items:baseline;padding:18px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px}
+  header .title{display:flex;align-items:center;gap:8px;font-weight:600;font-size:16px}
+  header .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  header .crumbs{color:var(--muted);font-family:var(--mono);font-size:12px}
+  header .crumbs a{color:var(--muted);text-decoration:none}
+  header .crumbs a:hover{color:var(--text)}
+  header .updated{color:var(--muted-dim);font-family:var(--mono);font-size:11px;text-align:right}
+  main{max-width:1080px;margin:0 auto;padding:20px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  @media (max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .stat .l{color:var(--muted);font-size:12px}
+  .stat .v{font-size:26px;font-weight:600;margin-top:4px}
+  .stat .s{font-family:var(--mono);font-size:11px;color:var(--muted-dim);margin-top:2px}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:99px;background:var(--bg);color:var(--accent)}
+  .pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px}
+  .panel h2{margin:0 0 2px;font-size:13px;font-weight:600}
+  .panel .sub{color:var(--muted-dim);font-size:11px;margin-bottom:10px}
+  .cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  @media (max-width:800px){.cols{grid-template-columns:1fr}}
+  .rank{list-style:none;margin:0;padding:0}
+  .rank li{display:flex;align-items:center;gap:8px;padding:5px 0;font-family:var(--mono);font-size:12px}
+  .rank .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rank .bar{height:4px;border-radius:2px;background:var(--accent);opacity:.6}
+  .rank .n{color:var(--muted);min-width:24px;text-align:right}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+  th{text-align:left;color:var(--muted-dim);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--border)}
+  td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted)}
+  td.ip{color:var(--text)}
+  td.p{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .empty{color:var(--muted-dim);font-family:var(--mono);font-size:12px;padding:14px 0}
+  .tooltip{position:absolute;pointer-events:none;background:#111214;color:var(--text);border:1px solid var(--border);font-family:var(--mono);font-size:11px;padding:4px 7px;border-radius:5px;opacity:0;transition:opacity .1s;white-space:nowrap;transform:translate(-50%,-100%)}
+  #chart-wrap{position:relative}
+  .panel h2{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .btn-link{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer}
+  .btn-link:hover{color:var(--text);border-color:var(--muted-dim)}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
+  .modal-backdrop.open{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:900px;width:100%;max-height:85vh;display:flex;flex-direction:column}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .modal-head .x{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1}
+  .modal-body{overflow:auto;padding:0 16px 16px}
+  .stat.clickable{cursor:pointer}
+  .stat.clickable:hover{border-color:var(--muted-dim)}
+</style>
+</head>
+<body>
+<header>
+  <div class="title"><span class="dot"></span>waf<span style="color:var(--muted-dim)">.homeserver.lan</span></div>
+  <div style="text-align:right">
+    <div class="crumbs"><a href="/">&larr; lobby</a> &middot; Coraza WAF &middot; OWASP CRS</div>
+    <div class="updated" id="updated">updated --:--:--</div>
+  </div>
+</header>
+<main>
+  <div class="stats">
+    <div class="stat"><div class="l">Blocked in the last 24 hours</div><div class="v" id="s-24h">0</div></div>
+    <div class="stat"><div class="l">Blocked in the last 7 days</div><div class="v" id="s-7d">0</div></div>
+    <div class="stat clickable" id="tile-uniq"><div class="l">Unique sources, 7 days</div><div class="v" id="s-uniq">0</div></div>
+    <div class="stat"><div class="l">Engine mode</div><div class="v"><span class="pill" id="s-mode">&hellip;</span></div><div class="s" id="s-engine">&nbsp;</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Blocked requests per hour</h2>
+    <div class="sub">Last 24 hours, your local time</div>
+    <div id="chart-wrap"><svg id="chart" style="width:100%;display:block"></svg><div class="tooltip" id="tip"></div></div>
+  </div>
+
+  <div class="cols">
+    <div class="panel"><h2>Top sources</h2><div class="sub">by IP, 7 days</div><ul class="rank" id="top-ips"></ul></div>
+    <div class="panel"><h2>Top paths</h2><div class="sub">query stripped, 7 days</div><ul class="rank" id="top-paths"></ul></div>
+    <div class="panel"><h2>Request types</h2><div class="sub">heuristic classification</div><ul class="rank" id="top-types"></ul></div>
+  </div>
+
+  <div class="panel">
+    <h2>Recent blocked requests <button class="btn-link" id="show-all-logs">Show all logs</button></h2>
+    <div class="sub">Newest first, up to 100</div>
+    <div id="recent-wrap"></div>
+  </div>
+</main>
+
+<script>
+(function () {
+  var ACCENT = '#d8c9a0';
+
+  function fmtTime(iso) {
+    return new Date(iso).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  }
+
+  function renderRank(id, entries, total) {
+    var ul = document.getElementById(id);
+    ul.textContent = '';
+    if (!entries.length) {
+      var li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'no data';
+      ul.appendChild(li);
+      return;
+    }
+    var max = entries[0][1] || 1;
+    entries.forEach(function (e) {
+      var li = document.createElement('li');
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = e[0];
+      var bar = document.createElement('span');
+      bar.className = 'bar';
+      bar.style.width = Math.max(6, (e[1] / max) * 60) + 'px';
+      var n = document.createElement('span');
+      n.className = 'n';
+      n.textContent = e[1];
+      li.appendChild(name);
+      li.appendChild(bar);
+      li.appendChild(n);
+      ul.appendChild(li);
+    });
+  }
+
+  function renderRecent(rows) {
+    var wrap = document.getElementById('recent-wrap');
+    wrap.textContent = '';
+    if (!rows.length) {
+      var e = document.createElement('div');
+      e.className = 'empty';
+      e.textContent = 'no blocked requests in the last 7 days';
+      wrap.appendChild(e);
+      return;
+    }
+    var table = document.createElement('table');
+    var thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>Time</th><th>Source</th><th>Method</th><th>Path</th><th>Type</th></tr>';
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      [fmtTime(r.t), null, r.m, r.p, r.c].forEach(function (val, i) {
+        var td = document.createElement('td');
+        if (i === 1) { td.className = 'ip'; td.textContent = r.ip; }
+        else if (i === 3) { td.className = 'p'; td.textContent = val; }
+        else { td.textContent = val; }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+  }
+
+  function renderChart(hourly) {
+    var svg = document.getElementById('chart');
+    var tip = document.getElementById('tip');
+    var wrapRect = svg.parentElement.getBoundingClientRect();
+    var W = Math.max(280, wrapRect.width);
+    var H = 140, padL = 4, padR = 4, padT = 8, padB = 20;
+    var innerW = W - padL - padR, innerH = H - padT - padB;
+    var n = hourly.length;
+    var max = Math.max(1, Math.max.apply(null, hourly.map(function (d) { return d.n; })));
+    var barGap = 3;
+    var barW = Math.max(2, innerW / n - barGap);
+
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('height', H);
+    svg.textContent = '';
+
+    [0, 0.5, 1].forEach(function (f) {
+      var y = padT + innerH * (1 - f);
+      var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', padL); line.setAttribute('x2', W - padR);
+      line.setAttribute('y1', y); line.setAttribute('y2', y);
+      line.setAttribute('stroke', '#2b2c31'); line.setAttribute('stroke-width', '1');
+      svg.appendChild(line);
+    });
+
+    var maxIdx = hourly.reduce(function (bi, d, i, arr) { return d.n > arr[bi].n ? i : bi; }, 0);
+    var labelEvery = W < 420 ? 6 : 3;
+
+    hourly.forEach(function (d, i) {
+      var x = padL + i * (innerW / n) + barGap / 2;
+      var h = (d.n / max) * (innerH - 6);
+      var y = padT + innerH - h;
+      var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', x); rect.setAttribute('y', y);
+      rect.setAttribute('width', barW); rect.setAttribute('height', Math.max(1, h));
+      rect.setAttribute('rx', Math.min(3, barW / 2));
+      rect.setAttribute('fill', ACCENT);
+      rect.setAttribute('opacity', d.n ? '0.85' : '0.25');
+      svg.appendChild(rect);
+
+      var hit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      hit.setAttribute('x', x - barGap / 2); hit.setAttribute('y', padT);
+      hit.setAttribute('width', barW + barGap); hit.setAttribute('height', innerH);
+      hit.setAttribute('fill', 'transparent');
+      hit.style.cursor = 'default';
+      hit.addEventListener('mousemove', function (ev) {
+        var r = svg.getBoundingClientRect();
+        tip.style.left = (ev.clientX - r.left) + 'px';
+        tip.style.top = (y - 6) + 'px';
+        tip.textContent = new Date(d.h).toLocaleTimeString([], {hour: '2-digit'}) + ' — ' + d.n + ' blocked';
+        tip.style.opacity = '1';
+      });
+      hit.addEventListener('mouseleave', function () { tip.style.opacity = '0'; });
+      svg.appendChild(hit);
+
+      if (i % labelEvery === 0 || i === maxIdx) {
+        var t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        t.setAttribute('x', x + barW / 2); t.setAttribute('y', H - 6);
+        t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '9');
+        t.setAttribute('fill', '#616268'); t.setAttribute('font-family', 'ui-monospace,monospace');
+        t.textContent = new Date(d.h).getHours() + 'h';
+        svg.appendChild(t);
+      }
+    });
+  }
+
+  var lastHourly = [];
+
+  function render(d) {
+    document.getElementById('updated').textContent = 'updated ' + new Date(d.updated).toLocaleTimeString();
+    document.getElementById('s-24h').textContent = d.count24h;
+    document.getElementById('s-7d').textContent = d.count7d;
+    document.getElementById('s-uniq').textContent = d.uniq7d;
+    var mode = document.getElementById('s-mode');
+    mode.textContent = d.mode === 'On' ? 'blocking' : d.mode;
+    document.getElementById('s-engine').textContent = d.engine || '';
+    renderRank('top-ips', d.topIps, d.count7d);
+    renderRank('top-paths', d.topPaths, d.count7d);
+    renderRank('top-types', d.types, d.count7d);
+    renderRecent(d.recent);
+    lastHourly = d.hourly;
+    renderChart(lastHourly);
+  }
+
+  function refresh() {
+    fetch('/waf.json', {cache: 'no-store'})
+      .then(function (r) { return r.json(); })
+      .then(render)
+      .catch(function () {});
+  }
+
+  window.addEventListener('resize', function () {
+    if (lastHourly.length) renderChart(lastHourly);
+  });
+
+  refresh();
+  setInterval(refresh, 30000);
+})();
+</script>
+
+<div class="modal-backdrop" id="log-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>All blocked requests <span id="log-modal-count" style="color:var(--muted-dim);font-family:var(--mono);font-size:11px"></span></div>
+      <button class="x" id="log-modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="log-modal-body"></div>
+  </div>
+</div>
+<script>
+(function () {
+  var backdrop = document.getElementById('log-modal');
+  var body = document.getElementById('log-modal-body');
+  var countEl = document.getElementById('log-modal-count');
+  function fmtTime(iso) { return new Date(iso).toLocaleString(); }
+  function renderFull(d) {
+    countEl.textContent = '(' + d.count + ')';
+    body.textContent = '';
+    if (!d.entries.length) {
+      var e = document.createElement('div');
+      e.className = 'empty';
+      e.textContent = 'no blocked requests found';
+      body.appendChild(e);
+      return;
+    }
+    var table = document.createElement('table');
+    var thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>Time</th><th>Source</th><th>Method</th><th>Path</th><th>Type</th></tr>';
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    d.entries.forEach(function (r) {
+      var tr = document.createElement('tr');
+      [fmtTime(r.t), null, r.m, r.p, r.c].forEach(function (val, i) {
+        var td = document.createElement('td');
+        if (i === 1) { td.className = 'ip'; td.textContent = r.ip; }
+        else if (i === 3) { td.className = 'p'; td.textContent = val; }
+        else { td.textContent = val; }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    body.appendChild(table);
+  }
+  document.getElementById('show-all-logs').addEventListener('click', function () {
+    backdrop.classList.add('open');
+    body.textContent = 'loading…';
+    fetch('/waf-full.json', {cache: 'no-store'})
+      .then(function (r) { return r.json(); })
+      .then(renderFull)
+      .catch(function () { body.textContent = 'failed to load'; });
+  });
+  document.getElementById('log-modal-close').addEventListener('click', function () {
+    backdrop.classList.remove('open');
+  });
+  backdrop.addEventListener('click', function (ev) {
+    if (ev.target === backdrop) backdrop.classList.remove('open');
+  });
+})();
+</script>
+
+<div class="modal-backdrop" id="ip-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>Unique sources <span id="ip-modal-count" style="color:var(--muted-dim);font-family:var(--mono);font-size:11px"></span></div>
+      <button class="x" id="ip-modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="ip-modal-body"></div>
+  </div>
+</div>
+<script>
+(function () {
+  var backdrop = document.getElementById('ip-modal');
+  var body = document.getElementById('ip-modal-body');
+  var countEl = document.getElementById('ip-modal-count');
+  function fmtTime(iso) { return new Date(iso).toLocaleString(); }
+  function renderIps(d) {
+    var stats = {};
+    d.entries.forEach(function (r) {
+      var s = stats[r.ip];
+      if (!s) { s = stats[r.ip] = {count: 0, last: r.t}; }
+      s.count += 1;
+      if (r.t > s.last) s.last = r.t;
+    });
+    var list = Object.keys(stats).map(function (ip) {
+      return {ip: ip, count: stats[ip].count, last: stats[ip].last};
+    });
+    list.sort(function (a, b) { return b.count - a.count; });
+    countEl.textContent = '(' + list.length + ')';
+    body.textContent = '';
+    if (!list.length) {
+      var e = document.createElement('div');
+      e.className = 'empty';
+      e.textContent = 'no blocked requests found';
+      body.appendChild(e);
+      return;
+    }
+    var table = document.createElement('table');
+    var thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>Source IP</th><th>Blocked requests</th><th>Last seen</th></tr>';
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    list.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var tdIp = document.createElement('td'); tdIp.className = 'ip'; tdIp.textContent = r.ip;
+      var tdCount = document.createElement('td'); tdCount.textContent = r.count;
+      var tdLast = document.createElement('td'); tdLast.textContent = fmtTime(r.last);
+      tr.appendChild(tdIp); tr.appendChild(tdCount); tr.appendChild(tdLast);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    body.appendChild(table);
+  }
+  document.getElementById('tile-uniq').addEventListener('click', function () {
+    backdrop.classList.add('open');
+    body.textContent = 'loading…';
+    fetch('/waf-full.json', {cache: 'no-store'})
+      .then(function (r) { return r.json(); })
+      .then(renderIps)
+      .catch(function () { body.textContent = 'failed to load'; });
+  });
+  document.getElementById('ip-modal-close').addEventListener('click', function () {
+    backdrop.classList.remove('open');
+  });
+  backdrop.addEventListener('click', function (ev) {
+    if (ev.target === backdrop) backdrop.classList.remove('open');
+  });
+})();
+</script>
+</body>
+</html>
