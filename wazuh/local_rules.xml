@@ -1,22 +1,4 @@
-<!-- Local rules -->
-
-<!-- Modify it at your will. -->
-<!-- Copyright (C) 2015, Wazuh Inc. -->
-
-<!-- Example -->
-<group name="local,syslog,sshd,">
-
-  <!--
-  Dec 10 01:02:02 host sshd[1234]: Failed none for root from 1.1.1.1 port 1066 ssh2
-  -->
-  <rule id="100001" level="5">
-    <if_sid>5716</if_sid>
-    <srcip>1.1.1.1</srcip>
-    <description>sshd: authentication failed from IP 1.1.1.1.</description>
-    <group>authentication_failed,pci_dss_10.2.4,pci_dss_10.2.5,</group>
-  </rule>
-
-</group>
+<!-- Local rules for homeserver -->
 
 <group name="local,rootcheck,">
   <rule id="100100" level="0">
@@ -24,5 +6,147 @@
     <match>Trojaned version of file</match>
     <regex type="pcre2">'/(usr/)?bin/(uname|md5sum|ls|env|echo|date|chown|chmod|chgrp|cat)'</regex>
     <description>Ignore rootcheck generic-signature FP on uutils coreutils</description>
+  </rule>
+</group>
+
+<group name="local,sshd,login,">
+  <rule id="100110" level="10">
+    <if_sid>5715</if_sid>
+    <description>SSH login: $(dstuser) from $(srcip)</description>
+    <group>authentication_success,</group>
+  </rule>
+</group>
+
+<group name="local,caddy,web,">
+  <rule id="100200" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="logger" type="pcre2">^http\.log\.access</field>
+    <description>Caddy access log</description>
+  </rule>
+
+  <rule id="100210" level="10">
+    <if_sid>100200</if_sid>
+    <field name="request.method">^POST$</field>
+    <field name="request.uri" type="pcre2">^/api/auth$</field>
+    <status>^200$</status>
+    <description>Pi-hole login from $(request.client_ip)</description>
+    <group>authentication_success,</group>
+  </rule>
+
+  <rule id="100211" level="5">
+    <if_sid>100200</if_sid>
+    <field name="request.method">^POST$</field>
+    <field name="request.uri" type="pcre2">^/api/auth$</field>
+    <status>^401$</status>
+    <description>Pi-hole failed login from $(request.client_ip)</description>
+    <group>authentication_failed,web_auth_failure,</group>
+  </rule>
+
+  <rule id="100220" level="10">
+    <if_sid>100200</if_sid>
+    <field name="request.method">^POST$</field>
+    <field name="request.uri" type="pcre2">^/files/api/login$</field>
+    <status>^200$</status>
+    <description>Filebrowser login from $(request.client_ip)</description>
+    <group>authentication_success,</group>
+  </rule>
+
+  <rule id="100221" level="5">
+    <if_sid>100200</if_sid>
+    <field name="request.method">^POST$</field>
+    <field name="request.uri" type="pcre2">^/files/api/login$</field>
+    <status>^403$</status>
+    <description>Filebrowser failed login from $(request.client_ip)</description>
+    <group>authentication_failed,web_auth_failure,</group>
+  </rule>
+
+  <rule id="100230" level="3">
+    <if_sid>100200</if_sid>
+    <field name="request.method">^POST$</field>
+    <field name="request.uri" type="pcre2">^/db/$</field>
+    <status>^302$</status>
+    <description>Adminer login submitted from $(request.client_ip)</description>
+  </rule>
+
+  <rule id="100231" level="5">
+    <if_sid>100200</if_sid>
+    <field name="request.method">^GET$</field>
+    <field name="request.uri" type="pcre2">^/db/\?.*username=</field>
+    <status>^403$</status>
+    <description>Adminer failed login from $(request.client_ip)</description>
+    <group>authentication_failed,web_auth_failure,</group>
+  </rule>
+
+  <rule id="100232" level="10" timeframe="10" ignore="60">
+    <if_sid>100200</if_sid>
+    <if_matched_sid>100230</if_matched_sid>
+    <same_field>request.client_ip</same_field>
+    <field name="request.method">^GET$</field>
+    <field name="request.uri" type="pcre2">^/db/\?.*username=</field>
+    <status>^200$</status>
+    <description>Adminer login from $(request.client_ip)</description>
+    <group>authentication_success,</group>
+  </rule>
+
+  <rule id="100240" level="10">
+    <if_sid>100200</if_sid>
+    <status>^403$</status>
+    <field name="resp_headers.X-Waf-Block" type="pcre2">true</field>
+    <description>WAF blocked request from $(request.client_ip)</description>
+    <group>waf,attack,</group>
+  </rule>
+
+  <rule id="100241" level="12" frequency="5" timeframe="60" ignore="300">
+    <if_matched_sid>100240</if_matched_sid>
+    <same_field>request.client_ip</same_field>
+    <description>WAF: sustained attack from $(request.client_ip) (5+ blocks in 60s)</description>
+    <group>waf,attack,</group>
+  </rule>
+
+  <rule id="100290" level="10" frequency="5" timeframe="120">
+    <if_matched_group>web_auth_failure</if_matched_group>
+    <same_field>request.client_ip</same_field>
+    <description>Web login brute force from $(request.client_ip)</description>
+    <group>authentication_failures,</group>
+  </rule>
+</group>
+
+<group name="local,uptime_kuma,">
+  <rule id="100300" level="0">
+    <decoded_as>uptime-kuma</decoded_as>
+    <description>Uptime Kuma auth event</description>
+  </rule>
+
+  <rule id="100301" level="3">
+    <if_sid>100300</if_sid>
+    <match>Login by username + password</match>
+    <description>Uptime Kuma password login attempt</description>
+  </rule>
+
+  <rule id="100302" level="5">
+    <if_sid>100300</if_sid>
+    <match>Incorrect username or password</match>
+    <description>Uptime Kuma failed login for $(dstuser)</description>
+    <group>authentication_failed,</group>
+  </rule>
+
+  <rule id="100304" level="3">
+    <if_sid>100300</if_sid>
+    <match>Successfully logged in user</match>
+    <description>Uptime Kuma session success (token or password)</description>
+  </rule>
+
+  <rule id="100303" level="10" timeframe="10">
+    <if_sid>100304</if_sid>
+    <if_matched_sid>100301</if_matched_sid>
+    <description>Uptime Kuma login: $(dstuser) from $(srcip)</description>
+    <group>authentication_success,</group>
+  </rule>
+
+  <rule id="100305" level="10" timeframe="10">
+    <if_sid>100301</if_sid>
+    <if_matched_sid>100304</if_matched_sid>
+    <description>Uptime Kuma login from $(srcip)</description>
+    <group>authentication_success,</group>
   </rule>
 </group>

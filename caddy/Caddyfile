@@ -20,6 +20,7 @@ homeserver.lan {
 		directives `
             Include @coraza.conf-recommended
             Include @crs-setup.conf.example
+            SecAction "id:900200,phase:1,pass,t:none,nolog,setvar:'tx.allowed_methods=GET HEAD POST OPTIONS PUT PATCH DELETE'"
             Include @owasp_crs/*.conf
             SecRuleEngine On
         `

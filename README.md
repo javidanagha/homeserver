@@ -71,6 +71,12 @@ System logs ─► Wazuh manager (analysisd) ─► alerts.json ─► wazuh-tel
 
 **Rootcheck false positives on Ubuntu 26.04.** Wazuh flagged `ls`, `cat`, `chmod` and other coreutils as trojaned. Ubuntu now ships Rust `uutils` coreutils, whose binaries contain strings that match Wazuh's legacy generic signatures. I verified the binaries against package checksums (`dpkg --verify rust-coreutils`), then suppressed only those paths with a local rule. Rootcheck stays enabled for everything else.
 
+**CRS blocked legitimate HTTP methods.** OWASP CRS allows only `GET HEAD POST OPTIONS` by default, so Pi-hole's logout (`DELETE /api/auth`) and message dismissal were silently blocked, and the session survived a refresh. Found via the WAF dashboard and fixed with a `tx.allowed_methods` override (rule 900200) placed between `crs-setup` and the CRS rules.
+
+**Composite rules vs. multi-threaded analysisd.** A Kuma password attempt and its success line arrive in the same journald batch and were processed in parallel, so neither `if_matched_sid` rule ever saw the other. Pinning `analysisd.event_threads` and `rule_matching_threads` to 1 restored ordering, which is negligible cost at home-server volume.
+
+**WAF → Telegram.** Every Coraza block raises a level-10 alert (rate-limited to 1 message/min per rule and IP in the forwarder), and 5+ blocks from one IP in 60 s raise a level-12 "sustained attack" alert.
+
 ## Repository layout
 
 ```
@@ -90,5 +96,4 @@ Configs are sanitized: credentials, keys, certificates and network-specific secr
 - [x] Pi-hole + encrypted upstream DNS
 - [x] Caddy + Coraza WAF, dashboard, PostgreSQL archive
 - [x] Wazuh manager
-
-
+- [x] Wazuh → Telegram alerting (logins, WAF blocks, brute force)
