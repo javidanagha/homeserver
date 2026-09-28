@@ -95,5 +95,4 @@ Configs are sanitized: credentials, keys, certificates and network-specific secr
 
 - [x] Pi-hole + encrypted upstream DNS
 - [x] Caddy + Coraza WAF, dashboard, PostgreSQL archive
-- [x] Wazuh manager
 - [x] Wazuh → Telegram alerting (logins, WAF blocks, brute force)
