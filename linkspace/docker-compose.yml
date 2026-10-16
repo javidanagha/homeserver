@@ -1,0 +1,55 @@
+services:
+  desktop:
+    build: ./desktop
+    container_name: linkspace-desktop
+    restart: unless-stopped
+    shm_size: 512m
+    mem_limit: 1g
+    environment:
+      VNC_PASSWORD: ${VNC_PASSWORD}
+      VNC_GEOMETRY: ${VNC_GEOMETRY:-1280x720}
+    volumes:
+      - desktop_home:/home/linkspace
+    networks: [internal]
+
+  guacd:
+    image: guacamole/guacd:1.5.5
+    container_name: linkspace-guacd
+    restart: unless-stopped
+    networks: [internal]
+
+  db:
+    image: postgres:16-alpine
+    container_name: linkspace-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: guacamole_db
+      POSTGRES_USER: guacamole_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./initdb/initdb.sql:/docker-entrypoint-initdb.d/initdb.sql:ro
+    networks: [internal]
+
+  guacamole:
+    image: guacamole/guacamole:1.5.5
+    container_name: linkspace-guacamole
+    restart: unless-stopped
+    depends_on: [guacd, db]
+    environment:
+      GUACD_HOSTNAME: guacd
+      POSTGRESQL_HOSTNAME: db
+      POSTGRESQL_DATABASE: guacamole_db
+      POSTGRESQL_USER: guacamole_user
+      POSTGRESQL_PASSWORD: ${DB_PASSWORD}
+      WEBAPP_CONTEXT: ROOT
+    ports:
+      - "127.0.0.1:8095:8080"
+    networks: [internal]
+
+networks:
+  internal:
+
+volumes:
+  desktop_home:
+  db_data:
